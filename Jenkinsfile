@@ -4,7 +4,6 @@ pipeline {
     environment {
         // Configuration Maven
         MAVEN_OPTS = '-Xmx1024m'
-
     }
 
     stages {
@@ -12,6 +11,23 @@ pipeline {
             steps {
                 // Récupération du code source
                 checkout scm
+            }
+        }
+
+        stage('Debug Application Properties') {
+            steps {
+                script {
+                    echo "Vérification du fichier application.properties..."
+
+                    // Vérification que le fichier existe
+                    bat 'dir src\\main\\resources\\application.properties'
+
+                    // Affichage du contenu (masquer les mots de passe)
+                    bat 'type src\\main\\resources\\application.properties'
+
+                    // Vérification de l'encodage du fichier
+                    bat 'chcp'
+                }
             }
         }
 
@@ -63,16 +79,16 @@ pipeline {
                     ]) {
 
                         echo "Building Spring Boot app with Maven..."
-                        echo "Database URL: jdbc:postgresql://pfe-ocp-group.c.aivencloud.com:10688/defaultdb?ssl=require"
+                        echo "Database URL: jdbc:postgresql://pfe-ocp-group.c.aivencloud.com:10688/defaultdb"
                         echo "Database User: ${env.SPRING_DB_USER}"
 
-                        // Build avec Maven sur Windows
+                        // Build avec Maven sur Windows avec encodage UTF-8
                         bat '''
-                            echo "Compilation du projet..."
-                            mvnw.cmd clean compile
+                            echo "Compilation du projet avec encodage UTF-8..."
+                            mvnw.cmd clean compile -Dproject.build.sourceEncoding=UTF-8 -Dproject.reporting.outputEncoding=UTF-8 -Dfile.encoding=UTF-8
 
                             echo "Packaging de l'application..."
-                            mvnw.cmd package -DskipTests
+                            mvnw.cmd package -DskipTests -Dproject.build.sourceEncoding=UTF-8 -Dproject.reporting.outputEncoding=UTF-8 -Dfile.encoding=UTF-8
                         '''
                     }
                 }
@@ -89,7 +105,7 @@ pipeline {
                         "SPRING_PROFILES_ACTIVE=test"
                     ]) {
                         echo "Exécution des tests Maven..."
-                        bat 'mvnw.cmd test'
+                        bat 'mvnw.cmd test -Dproject.build.sourceEncoding=UTF-8 -Dfile.encoding=UTF-8'
                     }
                 }
             }
@@ -109,7 +125,7 @@ pipeline {
                         "SPRING_DB_PASS=${env.DATABASE_PASS}"
                     ]) {
                         echo "Création du JAR Spring Boot..."
-                        bat 'mvnw.cmd spring-boot:repackage'
+                        bat 'mvnw.cmd spring-boot:repackage -Dproject.build.sourceEncoding=UTF-8 -Dfile.encoding=UTF-8'
                     }
                 }
             }
