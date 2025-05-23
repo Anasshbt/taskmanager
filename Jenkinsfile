@@ -4,7 +4,7 @@ pipeline {
     environment {
         // Configuration Maven
         MAVEN_OPTS = '-Xmx1024m'
-        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk' // Ajustez selon votre version Java
+
     }
 
     stages {
