@@ -100,12 +100,14 @@ pipeline {
                         dir target\\*.jar 2>nul || echo "Aucun fichier JAR trouvé"
                     '''
 
-                    // Archive si le JAR existe
-                    if (fileExists('target/*.jar')) {
+                    // Archive directement - le JAR existe clairement dans les logs
+                    try {
                         archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
                         echo "🎉 JAR archivé avec succès !"
-                    } else {
-                        error "❌ Aucun JAR trouvé à archiver"
+                    } catch (Exception e) {
+                        // Tentative avec le nom exact du fichier
+                        archiveArtifacts artifacts: 'target/task-manager-0.0.1-SNAPSHOT.jar', fingerprint: true
+                        echo "🎉 JAR archivé avec succès (nom exact) !"
                     }
                 }
             }
