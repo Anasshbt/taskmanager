@@ -3,8 +3,10 @@ pipeline {
 
     environment {
         // Configuration Maven
-        MAVEN_OPTS = '-Xmx1024m'
-
+        MAVEN_OPTS = '-Xmx1024m -Dfile.encoding=UTF-8'
+        // Propriétés Maven pour l'encodage
+        MAVEN_RESOURCE_ENCODING = 'UTF-8'
+        PROJECT_BUILD_SOURCEENCODING = 'UTF-8'
     }
 
     stages {
@@ -15,51 +17,13 @@ pipeline {
             }
         }
 
-        stage('Debug Application Properties') {
-            steps {
-                script {
-                    echo "Vérification du fichier application.properties..."
-
-                    // Vérification que le fichier existe
-                    bat 'dir src\\main\\resources\\application.properties'
-
-                    // Affichage du contenu (masquer les mots de passe)
-                    bat 'type src\\main\\resources\\application.properties'
-
-                    // Vérification de l'encodage du fichier
-                    bat 'chcp'
-                }
-            }
-        }
-
-        stage('Debug Maven & Network') {
-            steps {
-                script {
-                    echo "Diagnostic Maven et connectivité réseau..."
-
-                    // Vérification de Maven
-                    bat 'mvnw.cmd --version'
-
-                    // Test de connectivité Maven Central
-                    bat 'ping -n 4 repo.maven.apache.org'
-
-                    // Vérification des répertoires Maven
-                    bat 'echo %USERPROFILE%\\.m2'
-                    bat 'dir "%USERPROFILE%\\.m2" 2>nul || echo "Répertoire .m2 n\'existe pas"'
-
-                    // Test de téléchargement simple
-                    bat 'curl -I https://repo.maven.apache.org/maven2/ || echo "Curl failed"'
-                }
-            }
-        }
-
         stage('Get Secrets from Vault') {
             steps {
                 script {
-                    // Version alternative avec chemin simplifié
+                    // Récupération des secrets depuis Vault
                     def secrets = [
                         [
-                            path: 'kv/myapp', // Essayez sans /data/
+                            path: 'kv/myapp',
                             engineVersion: 2,
                             secretValues: [
                                 [envVar: 'SPRING_DB_USER', vaultKey: 'SPRING_DB_USER'],
@@ -92,8 +56,6 @@ pipeline {
             steps {
                 script {
                     // Configuration des variables d'environnement pour Spring Boot
-                    // Les variables SPRING_DB_USER et SPRING_DB_PASS sont utilisées directement
-                    // dans votre application.properties
                     withEnv([
                         "SPRING_DB_USER=${env.DATABASE_USER}",
                         "SPRING_DB_PASS=${env.DATABASE_PASS}",
@@ -104,61 +66,20 @@ pipeline {
                         echo "Database URL: jdbc:postgresql://pfe-ocp-group.c.aivencloud.com:10688/defaultdb"
                         echo "Database User: ${env.SPRING_DB_USER}"
 
-                        // Tentative 1: Build normal avec refresh des dépendances
-                        script {
-                            try {
-                                bat '''
-                                    echo "=== TENTATIVE 1: Build standard avec refresh ==="
-                                    mvnw.cmd clean compile -U ^
-                                        -Dproject.build.sourceEncoding=UTF-8 ^
-                                        -Dproject.reporting.outputEncoding=UTF-8 ^
-                                        -Dfile.encoding=UTF-8
+                        // Build complet avec génération du JAR Spring Boot
+                        bat '''
+                            echo "=== BUILD COMPLET SPRING BOOT ==="
+                            mvnw.cmd clean package -DskipTests ^
+                                -Dproject.build.sourceEncoding=UTF-8 ^
+                                -Dproject.reporting.outputEncoding=UTF-8 ^
+                                -Dfile.encoding=UTF-8
 
-                                    echo "Packaging de l'application..."
-                                    mvnw.cmd package -DskipTests ^
-                                        -Dproject.build.sourceEncoding=UTF-8 ^
-                                        -Dproject.reporting.outputEncoding=UTF-8 ^
-                                        -Dfile.encoding=UTF-8
-                                '''
-                            } catch (Exception e) {
-                                echo "❌ Tentative 1 échouée: ${e.getMessage()}"
-                                echo "🔄 Essai avec nettoyage du cache Maven..."
+                            echo "=== VÉRIFICATION DU JAR GÉNÉRÉ ==="
+                            dir target\\*.jar
 
-                                // Tentative 2: Nettoyage complet du cache
-                                bat '''
-                                    echo "=== TENTATIVE 2: Nettoyage cache et rebuild ==="
-                                    echo "Suppression du cache Maven local..."
-                                    if exist "%USERPROFILE%\\.m2\\repository" rmdir /s /q "%USERPROFILE%\\.m2\\repository"
-
-                                    echo "Build avec téléchargement forcé..."
-                                    mvnw.cmd clean compile -U -o false ^
-                                        -Dproject.build.sourceEncoding=UTF-8 ^
-                                        -Dproject.reporting.outputEncoding=UTF-8 ^
-                                        -Dfile.encoding=UTF-8
-
-                                    mvnw.cmd package -DskipTests ^
-                                        -Dproject.build.sourceEncoding=UTF-8 ^
-                                        -Dproject.reporting.outputEncoding=UTF-8 ^
-                                        -Dfile.encoding=UTF-8
-                                '''
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-
-
-        stage('Package Application') {
-            steps {
-                script {
-                    withEnv([
-                        "SPRING_DB_USER=${env.DATABASE_USER}",
-                        "SPRING_DB_PASS=${env.DATABASE_PASS}"
-                    ]) {
-                        echo "Création du JAR Spring Boot..."
-                        bat 'mvnw.cmd spring-boot:repackage -Dproject.build.sourceEncoding=UTF-8 -Dfile.encoding=UTF-8'
+                            echo "=== INFORMATIONS SUR LE JAR ==="
+                            for %%f in (target\\*.jar) do echo Fichier JAR: %%f
+                        '''
                     }
                 }
             }
@@ -169,10 +90,23 @@ pipeline {
                 script {
                     // Archive du JAR généré par Maven
                     echo "Archivage des artifacts..."
-                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
 
-                    // Affichage des informations sur le JAR créé (Windows)
-                    bat 'dir target\\*.jar'
+                    // Vérification que le JAR existe avant archivage
+                    bat '''
+                        echo "=== CONTENU DU RÉPERTOIRE TARGET ==="
+                        dir target
+
+                        echo "=== RECHERCHE DES FICHIERS JAR ==="
+                        dir target\\*.jar 2>nul || echo "Aucun fichier JAR trouvé"
+                    '''
+
+                    // Archive si le JAR existe
+                    if (fileExists('target/*.jar')) {
+                        archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                        echo "🎉 JAR archivé avec succès !"
+                    } else {
+                        error "❌ Aucun JAR trouvé à archiver"
+                    }
                 }
             }
         }
@@ -193,17 +127,7 @@ pipeline {
 
         success {
             echo "✅ Build réussi ! Application Spring Boot PostgreSQL compilée avec succès."
-            echo "JAR disponible dans target/"
-
-            // Archive du JAR même en cas de succès
-            script {
-                if (fileExists('target/*.jar')) {
-                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
-                    echo "🎉 JAR archivé avec succès dans Jenkins !"
-                } else {
-                    echo "⚠️ Aucun JAR trouvé dans target/"
-                }
-            }
+            echo "🎉 JAR généré et archivé avec succès !"
         }
 
         failure {
