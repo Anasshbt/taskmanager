@@ -4,6 +4,7 @@ pipeline {
     environment {
         // Configuration Maven
         MAVEN_OPTS = '-Xmx1024m'
+        JAVA_HOME = '/usr/lib/jvm/java-11-openjdk' // Ajustez selon votre version Java
     }
 
     stages {
@@ -65,13 +66,13 @@ pipeline {
                         echo "Database URL: jdbc:postgresql://pfe-ocp-group.c.aivencloud.com:10688/defaultdb"
                         echo "Database User: ${env.SPRING_DB_USER}"
 
-                        // Build avec Maven
-                        sh '''
+                        // Build avec Maven sur Windows
+                        bat '''
                             echo "Compilation du projet..."
-                            ./mvnw clean compile
+                            mvnw.cmd clean compile
 
                             echo "Packaging de l'application..."
-                            ./mvnw package -DskipTests
+                            mvnw.cmd package -DskipTests
                         '''
                     }
                 }
@@ -88,7 +89,7 @@ pipeline {
                         "SPRING_PROFILES_ACTIVE=test"
                     ]) {
                         echo "Exécution des tests Maven..."
-                        sh './mvnw test'
+                        bat 'mvnw.cmd test'
                     }
                 }
             }
@@ -108,7 +109,7 @@ pipeline {
                         "SPRING_DB_PASS=${env.DATABASE_PASS}"
                     ]) {
                         echo "Création du JAR Spring Boot..."
-                        sh './mvnw spring-boot:repackage'
+                        bat 'mvnw.cmd spring-boot:repackage'
                     }
                 }
             }
@@ -121,8 +122,8 @@ pipeline {
                     echo "Archivage des artifacts..."
                     archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
 
-                    // Affichage des informations sur le JAR créé
-                    sh 'ls -la target/*.jar'
+                    // Affichage des informations sur le JAR créé (Windows)
+                    bat 'dir target\\*.jar'
                 }
             }
         }
