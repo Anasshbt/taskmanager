@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/header :: head('Détails de la Tâche')">
+</head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="fragments/header :: navbar"></nav>
+
+<div th:replace="fragments/header :: alerts"></div>
+
+<div class="container my-4">
+    <div class="card shadow-sm">
+        <div class="card-header" th:classappend="${task.status.name() == 'TODO' ? 'bg-warning' :
+                                                      (task.status.name() == 'IN_PROGRESS' ? 'bg-info' :
+                                                      (task.status.name() == 'COMPLETED' ? 'bg-success' : 'bg-secondary'))}">
+            <h3 class="mb-0 text-white">
+                <i class="fas fa-tasks me-2"></i> Détails de la tâche
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <h4 class="text-primary" th:text="${task.title}"></h4>
+
+                    <div class="mb-4">
+                            <span class="badge"
+                                  th:classappend="${task.status.name() == 'TODO' ? 'bg-warning' :
+                                                 (task.status.name() == 'IN_PROGRESS' ? 'bg-info' :
+                                                 (task.status.name() == 'COMPLETED' ? 'bg-success' : 'bg-secondary'))}"
+                                  th:text="${task.status.displayName}"></span>
+
+                        <span class="badge bg-secondary ms-2" th:text="${task.priorityLabel}"></span>
+
+                        <span th:if="${task.overdue}" class="badge bg-danger ms-2">En retard</span>
+                    </div>
+
+                    <div class="mb-3">
+                        <h5>Description</h5>
+                        <p th:if="${task.description}" th:text="${task.description}" class="mb-0"></p>
+                        <p th:unless="${task.description}" class="text-muted mb-0">Aucune description</p>
+                    </div>
+
+                    <div class="mb-3">
+                        <h5>Date d'échéance</h5>
+                        <p th:if="${task.dueDate}" th:text="${#temporals.format(task.dueDate, 'dd/MM/yyyy')}" class="mb-0"></p>
+                        <p th:unless="${task.dueDate}" class="text-muted mb-0">Aucune date d'échéance</p>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Créée le:</strong> <span th:text="${#temporals.format(task.createdAt, 'dd/MM/yyyy HH:mm')}"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Dernière modification:</strong> <span th:text="${#temporals.format(task.updatedAt, 'dd/MM/yyyy HH:mm')}"></span></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-flex flex-column align-items-end">
+                        <div class="mb-3">
+                            <a th:href="@{/tasks/{id}/edit(id=${task.id})}" class="btn btn-primary">
+                                <i class="fas fa-edit me-1"></i> Modifier
+                            </a>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="dropdown">
+                                <button class="btn btn-info dropdown-toggle" type="button" id="statusDropdown"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-exchange-alt me-1"></i> Changer le statut
+                                </button>
+                                <ul class="dropdown-menu" aria-labelledby="statusDropdown">
+                                    <li th:each="status : ${statuses}">
+                                        <form th:if="${task.status != status}" th:action="@{/tasks/{id}/status(id=${task.id})}" method="post">
+                                            <input type="hidden" name="status" th:value="${status}" />
+                                            <button type="submit" class="dropdown-item" th:text="${status.displayName}"></button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div>
+                            <form th:action="@{/tasks/{id}/delete(id=${task.id})}" method="post"
+                                  onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette tâche?')">
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="fas fa-trash me-1"></i> Supprimer
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <a th:href="@{/tasks}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Retour à la liste
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="mt-auto">
+    <footer th:replace="fragments/footer :: footer"></footer>
+</div>
+</body>
+</html>

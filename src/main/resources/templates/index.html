@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="fragments/header :: head('Accueil')">
+</head>
+<body class="d-flex flex-column min-vh-100">
+<nav th:replace="fragments/header :: navbar"></nav>
+
+<div th:replace="fragments/header :: alerts"></div>
+
+<div class="container my-4">
+    <div class="p-5 mb-4 bg-light rounded-3 text-center">
+        <div class="container-fluid py-5">
+            <h1 class="display-5 fw-bold">Gestionnaire de Tâches</h1>
+            <p class="fs-4">Organisez vos tâches efficacement</p>
+            <a th:href="@{/tasks}" class="btn btn-primary btn-lg">
+                <i class="fas fa-list me-2"></i> Voir toutes les tâches
+            </a>
+            <a th:href="@{/tasks/new}" class="btn btn-success btn-lg ms-2">
+                <i class="fas fa-plus me-2"></i> Ajouter une tâche
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistiques -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <h5 class="card-title"><i class="fas fa-tasks me-2"></i>Total</h5>
+                    <p class="display-4" th:text="${totalTasks}">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <h5 class="card-title"><i class="fas fa-clipboard-list me-2"></i>À faire</h5>
+                    <p class="display-4" th:text="${todoTasks}">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body text-center">
+                    <h5 class="card-title"><i class="fas fa-spinner me-2"></i>En cours</h5>
+                    <p class="display-4" th:text="${inProgressTasks}">0</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h5 class="card-title"><i class="fas fa-check-circle me-2"></i>Terminées</h5>
+                    <p class="display-4" th:text="${completedTasks}">0</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tâches en retard -->
+    <div class="card border-danger mb-4" th:if="${overdueTasks > 0}">
+        <div class="card-header bg-danger text-white">
+            <h4 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Tâches en retard</h4>
+        </div>
+        <div class="card-body">
+            <p class="lead" th:text="'Vous avez ' + ${overdueTasks} + ' tâche(s) en retard'"></p>
+            <a th:href="@{/tasks/overdue}" class="btn btn-outline-danger">
+                <i class="fas fa-eye me-1"></i> Voir les tâches en retard
+            </a>
+        </div>
+    </div>
+
+    <!-- Tâches à venir -->
+    <div class="card border-primary">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Tâches à venir (7 prochains jours)</h4>
+        </div>
+        <div class="card-body">
+            <div th:if="${upcomingTasks.empty}" class="text-center py-3">
+                <p class="text-muted mb-0">Aucune tâche à venir pour les 7 prochains jours</p>
+            </div>
+            <div class="table-responsive" th:unless="${upcomingTasks.empty}">
+                <table class="table table-hover">
+                    <thead>
+                    <tr>
+                        <th>Titre</th>
+                        <th>Date d'échéance</th>
+                        <th>Statut</th>
+                        <th>Priorité</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="task : ${upcomingTasks}">
+                        <td th:text="${task.title}"></td>
+                        <td th:text="${#temporals.format(task.dueDate, 'dd/MM/yyyy')}"></td>
+                        <td>
+                                    <span class="badge"
+                                          th:classappend="${task.status.name() == 'TODO' ? 'bg-warning' :
+                                                         (task.status.name() == 'IN_PROGRESS' ? 'bg-info' :
+                                                         (task.status.name() == 'COMPLETED' ? 'bg-success' : 'bg-secondary'))}"
+                                          th:text="${task.status.displayName}"></span>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary" th:text="${task.priorityLabel}"></span>
+                        </td>
+                        <td>
+                            <a th:href="@{/tasks/{id}(id=${task.id})}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-auto">
+    <footer th:replace="fragments/footer :: footer"></footer>
+</div>
+</body>
+</html>
