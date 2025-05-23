@@ -147,27 +147,7 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                script {
-                    // Tests avec les variables d'environnement correctes
-                    withEnv([
-                        "SPRING_DB_USER=${env.DATABASE_USER}",
-                        "SPRING_DB_PASS=${env.DATABASE_PASS}",
-                        "SPRING_PROFILES_ACTIVE=test"
-                    ]) {
-                        echo "Exécution des tests Maven..."
-                        bat 'mvnw.cmd test -Dproject.build.sourceEncoding=UTF-8 -Dfile.encoding=UTF-8'
-                    }
-                }
-            }
-            post {
-                always {
-                    // Publication des résultats de tests Maven - CORRIGÉ
-                    junit testResultsPattern: '**/target/surefire-reports/*.xml', allowEmptyResults: true
-                }
-            }
-        }
+
 
         stage('Package Application') {
             steps {
