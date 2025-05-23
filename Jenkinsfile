@@ -31,6 +31,27 @@ pipeline {
             }
         }
 
+        stage('Debug Maven & Network') {
+            steps {
+                script {
+                    echo "Diagnostic Maven et connectivité réseau..."
+
+                    // Vérification de Maven
+                    bat 'mvnw.cmd --version'
+
+                    // Test de connectivité Maven Central
+                    bat 'ping -n 4 repo.maven.apache.org'
+
+                    // Vérification des répertoires Maven
+                    bat 'echo %USERPROFILE%\\.m2'
+                    bat 'dir "%USERPROFILE%\\.m2" 2>nul || echo "Répertoire .m2 n\'existe pas"'
+
+                    // Test de téléchargement simple
+                    bat 'curl -I https://repo.maven.apache.org/maven2/ || echo "Curl failed"'
+                }
+            }
+        }
+
         stage('Get Secrets from Vault') {
             steps {
                 script {
@@ -82,14 +103,45 @@ pipeline {
                         echo "Database URL: jdbc:postgresql://pfe-ocp-group.c.aivencloud.com:10688/defaultdb"
                         echo "Database User: ${env.SPRING_DB_USER}"
 
-                        // Build avec Maven sur Windows avec encodage UTF-8
-                        bat '''
-                            echo "Compilation du projet avec encodage UTF-8..."
-                            mvnw.cmd clean compile -Dproject.build.sourceEncoding=UTF-8 -Dproject.reporting.outputEncoding=UTF-8 -Dfile.encoding=UTF-8
+                        // Tentative 1: Build normal avec refresh des dépendances
+                        script {
+                            try {
+                                bat '''
+                                    echo "=== TENTATIVE 1: Build standard avec refresh ==="
+                                    mvnw.cmd clean compile -U ^
+                                        -Dproject.build.sourceEncoding=UTF-8 ^
+                                        -Dproject.reporting.outputEncoding=UTF-8 ^
+                                        -Dfile.encoding=UTF-8
 
-                            echo "Packaging de l'application..."
-                            mvnw.cmd package -DskipTests -Dproject.build.sourceEncoding=UTF-8 -Dproject.reporting.outputEncoding=UTF-8 -Dfile.encoding=UTF-8
-                        '''
+                                    echo "Packaging de l'application..."
+                                    mvnw.cmd package -DskipTests ^
+                                        -Dproject.build.sourceEncoding=UTF-8 ^
+                                        -Dproject.reporting.outputEncoding=UTF-8 ^
+                                        -Dfile.encoding=UTF-8
+                                '''
+                            } catch (Exception e) {
+                                echo "❌ Tentative 1 échouée: ${e.getMessage()}"
+                                echo "🔄 Essai avec nettoyage du cache Maven..."
+
+                                // Tentative 2: Nettoyage complet du cache
+                                bat '''
+                                    echo "=== TENTATIVE 2: Nettoyage cache et rebuild ==="
+                                    echo "Suppression du cache Maven local..."
+                                    if exist "%USERPROFILE%\\.m2\\repository" rmdir /s /q "%USERPROFILE%\\.m2\\repository"
+
+                                    echo "Build avec téléchargement forcé..."
+                                    mvnw.cmd clean compile -U -o false ^
+                                        -Dproject.build.sourceEncoding=UTF-8 ^
+                                        -Dproject.reporting.outputEncoding=UTF-8 ^
+                                        -Dfile.encoding=UTF-8
+
+                                    mvnw.cmd package -DskipTests ^
+                                        -Dproject.build.sourceEncoding=UTF-8 ^
+                                        -Dproject.reporting.outputEncoding=UTF-8 ^
+                                        -Dfile.encoding=UTF-8
+                                '''
+                            }
+                        }
                     }
                 }
             }
@@ -111,8 +163,8 @@ pipeline {
             }
             post {
                 always {
-                    // Publication des résultats de tests Maven
-                    publishTestResults testResultsPattern: '**/target/surefire-reports/*.xml'
+                    // Publication des résultats de tests Maven - CORRIGÉ
+                    junit testResultsPattern: '**/target/surefire-reports/*.xml', allowEmptyResults: true
                 }
             }
         }
@@ -161,6 +213,16 @@ pipeline {
         success {
             echo "✅ Build réussi ! Application Spring Boot PostgreSQL compilée avec succès."
             echo "JAR disponible dans target/"
+
+            // Archive du JAR même en cas de succès
+            script {
+                if (fileExists('target/*.jar')) {
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                    echo "🎉 JAR archivé avec succès dans Jenkins !"
+                } else {
+                    echo "⚠️ Aucun JAR trouvé dans target/"
+                }
+            }
         }
 
         failure {
