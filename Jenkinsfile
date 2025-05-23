@@ -9,7 +9,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-
+                // Récupération du code source
                 checkout scm
             }
         }
@@ -17,10 +17,10 @@ pipeline {
         stage('Get Secrets from Vault') {
             steps {
                 script {
-                    // Récupération des secrets depuis Vault
+                    // Version alternative avec chemin simplifié
                     def secrets = [
                         [
-                            path: 'kv/data/myapp', // Chemin dans Vault
+                            path: 'kv/myapp', // Essayez sans /data/
                             engineVersion: 2,
                             secretValues: [
                                 [envVar: 'SPRING_DB_USER', vaultKey: 'SPRING_DB_USER'],
@@ -32,19 +32,16 @@ pipeline {
                     // Utilisation du plugin Vault
                     withVault([
                         configuration: [
-                            vaultUrl: 'http://5.189.152.120:8200', // URL de votre serveur Vault
-                            vaultCredentialId: 'vault-secret', // ID des credentials Vault dans Jenkins
+                            vaultUrl: 'http://5.189.152.120:8200',
+                            vaultCredentialId: 'vault-secret',
                             engineVersion: 2
                         ],
                         vaultSecrets: secrets
                     ]) {
-                        // Les variables sont maintenant disponibles
-                        echo "Secrets récupérés avec succès depuis Vault"
+                        echo "✅ Secrets récupérés avec succès depuis Vault"
                         echo "DB User: ${env.SPRING_DB_USER}"
-                        // N'affichez jamais le mot de passe dans les logs !
                         echo "DB Password: [MASKED]"
 
-                        // Variables disponibles pour les étapes suivantes
                         env.DATABASE_USER = env.SPRING_DB_USER
                         env.DATABASE_PASS = env.SPRING_DB_PASS
                     }
@@ -84,24 +81,21 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
+                    // Tests avec les variables d'environnement correctes
                     withEnv([
-                        "SPRING_DATASOURCE_USERNAME=${env.DB_USERNAME}",
-                        "SPRING_DATASOURCE_PASSWORD=${env.DB_PASSWORD}",
+                        "SPRING_DB_USER=${env.DATABASE_USER}",
+                        "SPRING_DB_PASS=${env.DATABASE_PASS}",
                         "SPRING_PROFILES_ACTIVE=test"
                     ]) {
-                        if (fileExists('pom.xml')) {
-                            sh './mvnw test'
-                        } else {
-                            sh './gradlew test'
-                        }
+                        echo "Exécution des tests Maven..."
+                        sh './mvnw test'
                     }
                 }
             }
             post {
                 always {
-                    // Publication des résultats de tests
+                    // Publication des résultats de tests Maven
                     publishTestResults testResultsPattern: '**/target/surefire-reports/*.xml'
-                    publishTestResults testResultsPattern: '**/build/test-results/test/*.xml'
                 }
             }
         }
@@ -109,10 +103,12 @@ pipeline {
         stage('Package Application') {
             steps {
                 script {
-                    if (fileExists('pom.xml')) {
+                    withEnv([
+                        "SPRING_DB_USER=${env.DATABASE_USER}",
+                        "SPRING_DB_PASS=${env.DATABASE_PASS}"
+                    ]) {
+                        echo "Création du JAR Spring Boot..."
                         sh './mvnw spring-boot:repackage'
-                    } else {
-                        sh './gradlew bootJar'
                     }
                 }
             }
@@ -121,13 +117,12 @@ pipeline {
         stage('Archive Artifacts') {
             steps {
                 script {
-                    // Archive du JAR généré
-                    if (fileExists('target/*.jar')) {
-                        archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
-                    }
-                    if (fileExists('build/libs/*.jar')) {
-                        archiveArtifacts artifacts: 'build/libs/*.jar', fingerprint: true
-                    }
+                    // Archive du JAR généré par Maven
+                    echo "Archivage des artifacts..."
+                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+
+                    // Affichage des informations sur le JAR créé
+                    sh 'ls -la target/*.jar'
                 }
             }
         }
@@ -137,22 +132,23 @@ pipeline {
         always {
             // Nettoyage des variables sensibles
             script {
-                env.DB_USERNAME = null
-                env.DB_PASSWORD = null
+                env.DATABASE_USER = null
+                env.DATABASE_PASS = null
                 env.SPRING_DB_USER = null
                 env.SPRING_DB_PASS = null
             }
 
-            // Nettoyage de l'workspace si nécessaire
-            cleanWs()
+            echo "Nettoyage terminé"
         }
 
         success {
-            echo "Build réussi ! Application Spring Boot compilée avec succès."
+            echo "✅ Build réussi ! Application Spring Boot PostgreSQL compilée avec succès."
+            echo "JAR disponible dans target/"
         }
 
         failure {
-            echo "Build échoué. Vérifiez les logs pour plus de détails."
+            echo "❌ Build échoué. Vérifiez les logs pour plus de détails."
+            echo "Vérifiez la connexion à Vault et à PostgreSQL"
         }
     }
 }
