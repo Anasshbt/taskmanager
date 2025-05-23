@@ -63,7 +63,7 @@ pipeline {
                     ]) {
 
                         echo "Building Spring Boot app with Maven..."
-                        echo "Database URL: jdbc:postgresql://pfe-ocp-group.c.aivencloud.com:10688/defaultdb"
+                        echo "Database URL: jdbc:postgresql://pfe-ocp-group.c.aivencloud.com:10688/defaultdb?ssl=require"
                         echo "Database User: ${env.SPRING_DB_USER}"
 
                         // Build avec Maven sur Windows
